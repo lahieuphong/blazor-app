@@ -1,17 +1,17 @@
-# 🩻 BlazorApp - Demo DICOM Viewer
+# BlazorApp - Demo DICOM Viewer
 
-## 📘 Mô tả
+## Mô tả
 Ứng dụng Blazor đơn giản dùng để demo tính năng tải file DICOM lên và xử lý hiển thị cơ bản (bao gồm windowing, pan, zoom, tọa độ pixel...).
 
 ---
 
-## 🚀 Cách chạy ứng dụng
+## Cách chạy ứng dụng
 
-### ✅ Yêu cầu
+### Yêu cầu
 - [.NET SDK 8.0](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) hoặc 9.0 trở lên.
 - Terminal hoặc IDE như Visual Studio / VS Code.
 
-### ▶️ Hướng dẫn chạy
+### Hướng dẫn chạy
 
 ```bash
 # Bước 1: Build project
