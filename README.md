@@ -31,7 +31,7 @@ dotnet run
 ---
 
 Chọn *file DICOM bất kỳ*
-hoặc sử dụng các *file mẫu* trong thư mục: wwwroot/dicomfiles/*.dcm
+hoặc sử dụng các *file mẫu* trong thư mục: `wwwroot/dicomfiles/*.dcm`
 
 ![Chọn file](screenshots/view-converted-1.png)
 
