@@ -65,3 +65,4 @@
 /Users/lahieuphong/Documents/ThucTapC#/3.6.2025/Blazor/BlazorApp/obj/Debug/net8.0/BlazorApp.pdb
 /Users/lahieuphong/Documents/ThucTapC#/3.6.2025/Blazor/BlazorApp/obj/Debug/net8.0/BlazorApp.genruntimeconfig.cache
 /Users/lahieuphong/Documents/ThucTapC#/3.6.2025/Blazor/BlazorApp/obj/Debug/net8.0/ref/BlazorApp.dll
+/Users/lahieuphong/Documents/ThucTapC#/3.6.2025/Blazor/BlazorApp/obj/Debug/net8.0/BlazorApp.sourcelink.json

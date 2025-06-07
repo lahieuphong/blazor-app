@@ -21,7 +21,7 @@ p[b-cawgfizwi4] {
 
 .image-container[b-cawgfizwi4] {
     position: relative;
-    width: 40vw; /* Giảm kích thước khung ảnh */
+    width: 40vw; 
     max-width: 800px;
     background-color: black;
     border: 1px solid #444;
