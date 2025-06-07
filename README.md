@@ -27,7 +27,7 @@ dotnet run
 
 ## Mô tả hoạt động
 
-### File: `Không nén`
+### File: Không nén
 ---
 
 Chọn *file DICOM bất kỳ*
