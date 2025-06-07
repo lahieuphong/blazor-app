@@ -1,0 +1,83 @@
+body {
+    background-color: #121212;
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 0.8rem;
+}
+
+p {
+    margin: 0.2rem 0;
+    line-height: 1.4;
+}
+
+.image-gallery {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    margin-top: 20px;
+    padding-bottom: 30px;
+}
+
+.image-container {
+    position: relative;
+    width: 40vw; 
+    max-width: 800px;
+    background-color: black;
+    border: 1px solid #444;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+.dicom-image {
+    width: 100%;
+    display: block;
+    cursor: crosshair;
+    transition: filter 0.1s linear;
+}
+
+.overlay {
+    position: absolute;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    color: white;
+    max-width: 40%;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+}
+.top-left { top: 0; left: 0; }
+.top-right { top: 0; right: 0; text-align: right; }
+.bottom-left { bottom: 0; left: 0; }
+.bottom-right { bottom: 0; right: 0; text-align: right; }
+
+.pixel-info {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    padding: 3px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-size: 0.8rem;
+}
+
+input[type="file"] {
+    margin-top: 10px;
+    padding: 5px;
+    border-radius: 5px;
+    border: 1px solid #555;
+    background-color: #222;
+    color: white;
+    font-size: 0.8rem;
+}
+
+.alert {
+    margin-top: 20px;
+    background-color: #b00020;
+    padding: 12px;
+    border-radius: 5px;
+    max-width: 80vw;
+    color: white;
+    font-weight: bold;
+    font-size: 0.85rem;
+}

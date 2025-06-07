@@ -1,0 +1,277 @@
+﻿@page "/"
+@using BlazorApp.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject DicomService DicomService
+@inject IJSRuntime JSRuntime
+
+<h3>Chọn một hoặc nhiều file DICOM:</h3>
+<InputFile OnChange="OnFilesSelected" multiple />
+
+@if (errorMessages.Any())
+{
+    <div class="alert">
+        @foreach (var err in errorMessages)
+        {
+            <p>@err</p>
+        }
+    </div>
+}
+
+@if (dicomImages.Any())
+{
+    <div class="image-gallery">
+        @foreach (var dicom in dicomImages)
+        {
+            var idx = dicomImages.IndexOf(dicom);
+            <div class="image-container"
+                @onmousedown="e => StartDrag(e, dicom)"
+                @onmouseup="e => EndDrag(e, dicom)"
+                @onmousemove="e => OnMouseMove(e, dicom, idx)"
+                @onmouseleave="@(() => CancelHover(dicom))">
+
+                <img src="@dicom.Base64Image"
+                    class="dicom-image"
+                    style="@GetImageStyle(dicom)"
+                    @ref="dicom.ImageRef"
+                    draggable="false"
+                    ondragstart="return false;" />
+
+                <div class="overlay top-left">
+                    <p><strong>Size:</strong> @dicom.Width x @dicom.Height</p>
+                    <p>
+                        <strong>Window:</strong> @Math.Round(dicom.WindowCenter) / @Math.Round(dicom.WindowWidth)
+                    </p>
+
+                    @if (dicom.ShowPixelInfo)
+                    {
+                        <p>
+                            <strong>Pixel:</strong> X: @dicom.MouseX, Y: @dicom.MouseY,
+                            Giá trị: @(dicom.PixelValue ?? 0)
+                        </p>
+                    }
+                </div>
+                <div class="overlay top-right">
+                    <p><strong>Date:</strong> @dicom.FormattedStudyDate</p>
+                    <p><strong>Time:</strong> @dicom.FormattedStudyTime</p>
+                    <p><strong>Patient:</strong> @dicom.PatientName (@dicom.PatientID)</p>
+                </div>
+                <div class="overlay bottom-left">
+                    <p><strong>Zoom:</strong> @Math.Round(dicom.ZoomFactor * 100, 0)%</p>
+                    <p><strong>Orient:</strong> @dicom.Orientation</p>
+                    <p><strong>Voxel:</strong> @dicom.PixelSpacingX : @dicom.PixelSpacingY / @dicom.SliceThickness</p>
+                    <p><strong>Transfer Syntax:</strong> @dicom.FormattedTransferSyntax</p>
+                    <p><strong>Slice:</strong> @dicom.SliceLocation mm</p>
+                </div>
+                <div class="overlay bottom-right">
+                    <p><strong>TE/TR:</strong> @dicom.TE / @dicom.TR</p>
+                    <p><strong>Viện:</strong> @dicom.Institution</p>
+                </div>
+
+                @* <button @onclick="@(() => ResetTransform(dicom))">Reset Zoom/Pan</button> *@
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<DicomImageInfo> dicomImages = new();
+    private List<string> errorMessages = new();
+    private Dictionary<int, DOMRect> imageRects = new();
+    private Dictionary<DicomImageInfo, bool> isDragging = new();
+    private Dictionary<DicomImageInfo, double> lastMouseX = new();
+    private Dictionary<DicomImageInfo, double> lastMouseY = new();
+    private Dictionary<DicomImageInfo, int> activeMouseButton = new();
+
+    private async Task OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        dicomImages.Clear();
+        errorMessages.Clear();
+        imageRects.Clear();
+
+        foreach (var file in e.GetMultipleFiles())
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}_{file.Name}");
+            try
+            {
+                await using var stream = File.Create(tempPath);
+                await file.OpenReadStream(50 * 1024 * 1024).CopyToAsync(stream);
+            }
+            catch (Exception ex)
+            {
+                errorMessages.Add($"Không thể lưu file: {file.Name} - {ex.Message}");
+                continue;
+            }
+
+            var dicom = DicomService.LoadDicomInfo(tempPath);
+            if (dicom != null)
+            {
+                dicom.ZoomFactor = 1.0;
+                dicom.OffsetX = dicom.OffsetY = 0;
+                dicomImages.Add(dicom);
+                isDragging[dicom] = false;
+                lastMouseX[dicom] = lastMouseY[dicom] = 0;
+                activeMouseButton[dicom] = -1;
+            }
+            else
+            {
+                errorMessages.Add(DicomService.LastErrorMessage ?? $"Lỗi khi xử lý: {file.Name}");
+            }
+        }
+    }
+
+    private void StartDrag(MouseEventArgs e, DicomImageInfo dicom)
+    {
+        isDragging[dicom] = true;
+        lastMouseX[dicom] = e.ClientX;
+        lastMouseY[dicom] = e.ClientY;
+
+        if ((e.Buttons & 1) != 0)
+            activeMouseButton[dicom] = 0; // Left
+        else if ((e.Buttons & 4) != 0)
+            activeMouseButton[dicom] = 1; // Middle
+        else if ((e.Buttons & 2) != 0)
+            activeMouseButton[dicom] = 2; // Right
+        else
+            activeMouseButton[dicom] = -1; // default Left
+    }
+
+    private void EndDrag(MouseEventArgs e, DicomImageInfo dicom)
+    {
+        isDragging[dicom] = false;
+        activeMouseButton[dicom] = -1;
+    }
+
+    private DateTime lastRender = DateTime.MinValue;
+    private TimeSpan minRenderInterval = TimeSpan.FromMilliseconds(10);
+
+    private async Task OnMouseMove(MouseEventArgs e, DicomImageInfo dicom, int idx)
+    {
+        bool isLeftDown = (e.Buttons & 1) != 0;
+        bool isMiddleDown = (e.Buttons & 4) != 0;
+        bool isRightDown = (e.Buttons & 2) != 0;
+
+        bool isHolding = isLeftDown || isMiddleDown || isRightDown;
+
+        if (isDragging.TryGetValue(dicom, out var dragging) && dragging && isHolding && activeMouseButton[dicom] >= 0)
+        {
+            double deltaX = e.ClientX - lastMouseX[dicom];
+            double deltaY = e.ClientY - lastMouseY[dicom];
+
+            lastMouseX[dicom] = e.ClientX;
+            lastMouseY[dicom] = e.ClientY;
+
+            switch (activeMouseButton[dicom])
+            {
+                case 0: // Chuột trái: sáng tối + cập nhật pixel info
+                    dicom.WindowCenter = Math.Max(1, dicom.WindowCenter - deltaY * 1.5);
+                    dicom.WindowWidth = Math.Max(1, dicom.WindowWidth + deltaX * 1.5);
+                    await UpdatePixelInfoAsync(e, dicom, idx);
+                    break;
+
+                case 1: // Pan
+                    dicom.OffsetX += deltaX;
+                    dicom.OffsetY += deltaY;
+                    break;
+
+                case 2: // Zoom
+                    dicom.ZoomFactor = Math.Clamp(dicom.ZoomFactor + deltaY * 0.01, 0.2, 5.0);
+                    break;
+            }
+        }
+        else
+        {
+            await UpdatePixelInfoAsync(e, dicom, idx);
+        }
+
+        var now = DateTime.Now;
+        if (now - lastRender > minRenderInterval)
+        {
+            StateHasChanged();
+            lastRender = now;
+        }
+    }
+
+
+
+    private async Task UpdatePixelInfoAsync(MouseEventArgs e, DicomImageInfo dicom, int index)
+    {
+        var rect = await GetCachedImageRect(index);
+        if (rect.Width == 0 || rect.Height == 0)
+        {
+            dicom.ShowPixelInfo = false;
+            return;
+        }
+
+        double relX = e.ClientX - rect.Left;
+        double relY = e.ClientY - rect.Top;
+        double scaleX = dicom.Width / rect.Width;
+        double scaleY = dicom.Height / rect.Height;
+
+        int x = Math.Clamp((int)(relX * scaleX), 0, dicom.Width - 1);
+        int y = Math.Clamp((int)(relY * scaleY), 0, dicom.Height - 1);
+        int idx = y * dicom.Width + x;
+
+        ushort? pixelValue = (dicom.PixelData != null && idx < dicom.PixelData.Length)
+            ? dicom.PixelData[idx]
+            : null;
+
+        dicom.MouseX = x;
+        dicom.MouseY = y;
+        dicom.PixelValue = pixelValue;
+        dicom.ShowPixelInfo = true;
+
+        StateHasChanged();
+    }
+
+    private void CancelHover(DicomImageInfo dicom)
+    {
+        dicom.ShowPixelInfo = false;
+        dicom.PixelValue = null;
+        isDragging[dicom] = false;
+        StateHasChanged();
+    }
+
+    private void ResetTransform(DicomImageInfo dicom)
+    {
+        dicom.ZoomFactor = 1.0;
+        dicom.OffsetX = 0;
+        dicom.OffsetY = 0;
+        StateHasChanged();
+    }
+
+    private double GetBrightness(DicomImageInfo dicom)
+    {
+        return Math.Clamp(dicom.WindowCenter / 360.0, 0.3, 2.5);
+    }
+
+    private async Task<DOMRect> GetCachedImageRect(int index)
+    {
+        if (!imageRects.TryGetValue(index, out var rect))
+        {
+            rect = await JSRuntime.InvokeAsync<DOMRect>("getBoundingClientRectByIndex", index);
+            imageRects[index] = rect;
+        }
+        return rect;
+    }
+
+    private string GetImageStyle(DicomImageInfo dicom)
+    {
+        // Lấy giá trị brightness đã được clamp, chuyển về chuỗi đúng format CSS
+        string brightness = GetBrightness(dicom).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        string scale = dicom.ZoomFactor.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        string offsetX = dicom.OffsetX.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        string offsetY = dicom.OffsetY.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+        return $"filter: brightness({brightness}); transform: scale({scale}) translate({offsetX}px, {offsetY}px);";
+    }
+
+
+    public class DOMRect
+    {
+        public double Left { get; set; }
+        public double Top { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+
+    }
+}

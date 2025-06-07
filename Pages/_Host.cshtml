@@ -1,0 +1,100 @@
+﻿@page "/"
+@namespace BlazorApp.Pages
+@using Microsoft.AspNetCore.Components.Web
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="~/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link href="css/site.css" rel="stylesheet" />
+    @* <link href="css/app.css" rel="stylesheet" /> *@
+    <link href="BlazorApp.styles.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
+</head>
+
+<body>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
+
+    <div id="blazor-error-ui">
+        <environment include="Staging,Production">
+            An error has occurred. This application may no longer respond until reloaded.
+        </environment>
+        <environment include="Development">
+            An unhandled exception has occurred. See browser dev tools for details.
+        </environment>
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="_framework/blazor.server.js"></script>
+
+    <script>
+    window.getBoundingClientRectByIndex = (index) => {
+        const imgs = document.querySelectorAll('img.dicom-image');
+        if (index >= 0 && index < imgs.length) {
+        const rect = imgs[index].getBoundingClientRect();
+        return {
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height
+        };
+        }
+        // Trả về rect mặc định để tránh lỗi null bên C#
+        return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+    };
+
+    // Đăng ký sự kiện resize để Blazor có thể xóa cache kích thước ảnh khi cần
+    window.registerResizeHandler = (dotnetHelper) => {
+        window.addEventListener('resize', () => {
+        dotnetHelper.invokeMethodAsync('ClearImageRectsCache');
+        });
+    };
+
+    // Handler kéo chuột thay đổi độ sáng
+    window.brightnessHandler = (function () {
+        let isDragging = false;
+        let lastY = 0;
+        let dicomId = null;
+
+        function onMouseMove(e) {
+        if (!isDragging || !dicomId) return;
+
+        const deltaY = lastY - e.clientY;
+        lastY = e.clientY;
+
+        // Gọi method Blazor để cập nhật độ sáng, tên namespace + method phải đúng
+        DotNet.invokeMethodAsync('BlazorApp', 'AdjustBrightness', dicomId, deltaY);
+        }
+
+        return {
+        start: (id, e) => {
+            isDragging = true;
+            lastY = e.clientY;
+            dicomId = id;
+            window.addEventListener('mousemove', onMouseMove);
+        },
+        stop: () => {
+            isDragging = false;
+            dicomId = null;
+            window.removeEventListener('mousemove', onMouseMove);
+        }
+        };
+    })();
+
+    // Ngăn context menu toàn trang
+    window.addEventListener('contextmenu', function (e) {
+        // Chặn hoàn toàn menu chuột phải trên toàn bộ trang
+        e.preventDefault();
+    });
+    </script>
+
+</body>
+</html>
